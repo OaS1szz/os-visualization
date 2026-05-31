@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   opt, lru, fifo, generateRandomSeq, getPresetSeq,
@@ -51,12 +51,18 @@ function run() {
 
 function generateRandom() {
   refSeqStr.value = generateRandomSeq(20, 9).join(',')
+  run()
 }
 
 function loadPreset() {
   refSeqStr.value = getPresetSeq().join(',')
   frameCount.value = 3
+  run()
 }
+
+onMounted(() => {
+  run()
+})
 
 // 播放控制
 function startPlay() {

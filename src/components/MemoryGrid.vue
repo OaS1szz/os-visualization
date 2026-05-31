@@ -47,27 +47,21 @@ function buildOption() {
     }
   })
 
-  // 缺页标注
-  visibleStates.forEach((s) => {
-    if (s.fault) {
-      markAreas.push({
-        name: '缺页',
-        itemStyle: { color: 'rgba(245, 108, 108, 0.15)', borderColor: '#f56c6c', borderWidth: 1.5 },
-        xAxis: s.step - 0.5,
-      })
-    }
-  })
+  // 缺页标注（修正 markArea 数据格式）
+  markAreas.push(
+    ...visibleStates
+      .filter((s) => s.fault)
+      .map((s) => [
+        { xAxis: s.step - 0.5, yAxis: 0 },
+        { xAxis: s.step + 0.5, yAxis: props.frameCount },
+      ])
+  )
 
-  // 用分段标注模拟竖线
+  // 缺页标记点（放在底部物理块下方、x轴数字上方）
   const faultMarks = visibleStates
     .filter((s) => s.fault)
     .map((s) => ({
-      xAxis: s.step,
-      yAxis: 0,
-      symbol: 'triangle',
-      symbolSize: 10,
-      itemStyle: { color: '#f56c6c' },
-      label: { show: false },
+      coord: [s.step, props.frameCount - 1],
     }))
 
   const maxPage = Math.max(9, ...heatData.map((d) => d[2]))
@@ -79,10 +73,14 @@ function buildOption() {
 
   return {
     tooltip: {
+      trigger: 'item',
       formatter: (p) => {
-        const step = p.data[0]
-        const frame = p.data[1]
-        const page = p.data[2]
+        const d = p.data
+        // 只处理热力图数据（数组格式），忽略 scatter 等其他 series
+        if (!Array.isArray(d) || d.length < 3) return ''
+        const step = d[0]
+        const frame = d[1]
+        const page = d[2]
         if (page === -1) return `步骤 ${step}<br/>内存块 ${frame}: <空>`
         const faultInfo = visibleStates[step]?.fault ? ' (缺页!)' : ''
         return `步骤 ${step}<br/>内存块 ${frame}: 页面 ${page}${faultInfo}`
@@ -92,13 +90,13 @@ function buildOption() {
       left: 60,
       right: 30,
       top: 10,
-      bottom: 40,
+      bottom: 80,
     },
     xAxis: {
       type: 'category',
       name: '步骤',
       data: visibleStates.map((s) => s.step),
-      axisLabel: { fontSize: 10, rotate: 45 },
+      axisLabel: { fontSize: 12 },
       nameLocation: 'middle',
       nameGap: 25,
     },
@@ -126,7 +124,8 @@ function buildOption() {
         data: heatData,
         label: {
           show: true,
-          fontSize: 11,
+          fontSize: 16,
+          fontWeight: 'bold',
           formatter: (p) => (p.data[2] === -1 ? '-' : p.data[2]),
         },
         emphasis: {
@@ -135,14 +134,22 @@ function buildOption() {
             shadowColor: 'rgba(0, 0, 0, 0.3)',
           },
         },
-        markArea: markAreas.length > 0 ? { data: markAreas } : undefined,
-      },
-      {
-        type: 'scatter',
-        data: faultMarks,
-        symbol: 'pin',
-        symbolSize: 16,
-        itemStyle: { color: '#f56c6c' },
+        markArea: markAreas.length > 0
+          ? {
+              silent: true,
+              data: markAreas,
+              itemStyle: { color: 'rgba(245, 108, 108, 0.15)', borderColor: '#f56c6c', borderWidth: 1.5 },
+            }
+          : undefined,
+        markPoint: faultMarks.length > 0
+          ? {
+              symbol: 'pin',
+              symbolSize: 24,
+              symbolOffset: [0, 30],
+              itemStyle: { color: '#f56c6c' },
+              data: faultMarks,
+            }
+          : undefined,
       },
     ],
   }
