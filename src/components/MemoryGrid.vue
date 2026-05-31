@@ -29,7 +29,6 @@ function buildOption() {
   // X 轴：步骤 (0, 1, 2, ...)
   // Y 轴：内存块 (0, 1, ...)
   const heatData = []
-  const markAreas = []
 
   // 显示到 currentStep 或全部
   const endStep = props.currentStep >= 0
@@ -46,16 +45,6 @@ function buildOption() {
       }
     }
   })
-
-  // 缺页标注（修正 markArea 数据格式）
-  markAreas.push(
-    ...visibleStates
-      .filter((s) => s.fault)
-      .map((s) => [
-        { xAxis: s.step - 0.5, yAxis: 0 },
-        { xAxis: s.step + 0.5, yAxis: props.frameCount },
-      ])
-  )
 
   // 缺页标记点（放在底部物理块下方、x轴数字上方）
   const faultMarks = visibleStates
@@ -134,13 +123,6 @@ function buildOption() {
             shadowColor: 'rgba(0, 0, 0, 0.3)',
           },
         },
-        markArea: markAreas.length > 0
-          ? {
-              silent: true,
-              data: markAreas,
-              itemStyle: { color: 'rgba(245, 108, 108, 0.15)', borderColor: '#f56c6c', borderWidth: 1.5 },
-            }
-          : undefined,
         markPoint: faultMarks.length > 0
           ? {
               symbol: 'pin',
