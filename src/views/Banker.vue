@@ -1,11 +1,10 @@
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { getPresetData, checkSafety, requestResources } from '../algorithms/banker.js'
 
-// 资源标签
 const resourceLabels = ['A', 'B', 'C']
 
-// 数据
 const available = reactive([3, 3, 2])
 const processes = reactive([
   { id: 0, max: [7, 5, 3], allocation: [0, 1, 0] },
@@ -15,29 +14,63 @@ const processes = reactive([
   { id: 4, max: [4, 3, 3], allocation: [0, 0, 2] },
 ])
 
-// 结果
 const safeResult = ref(null)
 const requestResult = ref(null)
-
-// 请求表单
 const requestPid = ref(0)
 const requestRes = reactive([0, 0, 0])
 
-// 计算 need
 function calcNeed(p) {
   return p.max.map((v, j) => v - p.allocation[j])
 }
 
-// 检查安全性
+function validateState() {
+  for (const p of processes) {
+    for (let j = 0; j < resourceLabels.length; j++) {
+      if (p.allocation[j] > p.max[j]) {
+        ElMessage.error(`P${p.id} 的 ${resourceLabels[j]} Allocation 不能大于 Max`)
+        return false
+      }
+      if (p.allocation[j] < 0 || p.max[j] < 0) {
+        ElMessage.error('资源数据不能为负数')
+        return false
+      }
+    }
+  }
+
+  if (available.some((v) => v < 0)) {
+    ElMessage.error('Available 不能为负数')
+    return false
+  }
+
+  return true
+}
+
 function runCheckSafety() {
   requestResult.value = null
+  if (!validateState()) return
+
   const maxMatrix = processes.map((p) => p.max)
   const allocMatrix = processes.map((p) => p.allocation)
   safeResult.value = checkSafety(maxMatrix, allocMatrix, [...available])
 }
 
-// 发起资源请求
 function runRequest() {
+  if (!validateState()) return
+
+  const target = processes[requestPid.value]
+  if (!target) {
+    ElMessage.error('请求进程不存在')
+    return
+  }
+
+  const need = calcNeed(target)
+  for (let j = 0; j < requestRes.length; j++) {
+    if (requestRes[j] > need[j]) {
+      ElMessage.error(`请求超过 P${target.id} 的 ${resourceLabels[j]} Need`)
+      return
+    }
+  }
+
   const maxMatrix = processes.map((p) => p.max)
   const allocMatrix = processes.map((p) => p.allocation)
   requestResult.value = requestResources(
@@ -48,7 +81,6 @@ function runRequest() {
     [...requestRes]
   )
 
-  // 如果分配成功，更新数据和可用资源
   if (requestResult.value.granted) {
     const res = [...requestRes]
     processes[requestPid.value].allocation = processes[requestPid.value].allocation.map(
@@ -56,13 +88,12 @@ function runRequest() {
     )
     for (let j = 0; j < available.length; j++) {
       available[j] -= res[j]
+      requestRes[j] = 0
     }
-    // 更新安全性结果
     runCheckSafety()
   }
 }
 
-// 添加进程
 function addProcess() {
   const newId = processes.length
   processes.push({
@@ -72,17 +103,17 @@ function addProcess() {
   })
 }
 
-// 删除进程
 function removeProcess(index) {
   if (processes.length <= 1) return
   processes.splice(index, 1)
-  // 重新编号
-  processes.forEach((p, i) => (p.id = i))
+  processes.forEach((p, i) => {
+    p.id = i
+  })
+  requestPid.value = Math.min(requestPid.value, processes.length - 1)
   safeResult.value = null
   requestResult.value = null
 }
 
-// 加载预设
 function loadPreset() {
   const preset = getPresetData()
   available.splice(0, available.length, ...preset.available)
@@ -94,26 +125,24 @@ function loadPreset() {
       allocation: [...preset.allocation[i]],
     })
   })
+  requestPid.value = 0
+  requestRes.splice(0, requestRes.length, 0, 0, 0)
   safeResult.value = null
   requestResult.value = null
 }
 
-// 重置
 function reset() {
   loadPreset()
-  safeResult.value = null
-  requestResult.value = null
 }
 </script>
 
 <template>
   <div class="page-container">
     <div class="page-header">
-      <router-link to="/" class="back-link">← 返回首页</router-link>
-      <h1>🏦 银行家算法演示</h1>
+      <router-link to="/" class="back-link">返回首页</router-link>
+      <h1>银行家算法演示</h1>
     </div>
 
-    <!-- 资源总数 -->
     <div class="control-panel">
       <h3>可用资源总数</h3>
       <div class="resource-inputs">
@@ -135,13 +164,12 @@ function reset() {
       </div>
     </div>
 
-    <!-- 进程资源表 -->
     <div class="control-panel">
       <h3>进程资源状态</h3>
       <el-table :data="processes" border stripe style="width: 100%">
         <el-table-column prop="id" label="PID" width="60" />
         <el-table-column label="Max (A, B, C)">
-          <template #default="{ row, $index }">
+          <template #default="{ row }">
             <div class="inline-inputs">
               <el-input-number
                 v-for="j in 3"
@@ -156,7 +184,7 @@ function reset() {
           </template>
         </el-table-column>
         <el-table-column label="Allocation (A, B, C)">
-          <template #default="{ row, $index }">
+          <template #default="{ row }">
             <div class="inline-inputs">
               <el-input-number
                 v-for="j in 3"
@@ -186,12 +214,11 @@ function reset() {
       <el-button @click="addProcess" style="margin-top: 12px;" size="small">+ 添加进程</el-button>
     </div>
 
-    <!-- 安全性结果 -->
     <div v-if="safeResult" class="result-panel">
       <h3>安全性检查结果</h3>
       <div style="margin-bottom: 12px;">
         <el-tag :type="safeResult.safe ? 'success' : 'danger'" size="large">
-          {{ safeResult.safe ? '✅ 系统处于安全状态' : '❌ 系统处于不安全状态' }}
+          {{ safeResult.safe ? '系统处于安全状态' : '系统处于不安全状态' }}
         </el-tag>
       </div>
       <div v-if="safeResult.safe && safeResult.sequence.length > 0" style="margin-top: 12px;">
@@ -206,7 +233,6 @@ function reset() {
       </div>
     </div>
 
-    <!-- 资源请求 -->
     <div class="control-panel" style="margin-top: 20px;">
       <h3>资源请求</h3>
       <div class="control-row">

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { simulate } from '../algorithms/producerConsumer.js'
 import BufferVisual from '../components/BufferVisual.vue'
 import PlaybackControl from '../components/PlaybackControl.vue'
@@ -19,15 +19,22 @@ const speed = ref(1)
 
 let timer = null
 
+function clearTimer() {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+}
+
 function run() {
   result.value = simulate({ ...config })
   currentStep.value = 0
   stopPlay()
 }
 
-// 播放控制
 function startPlay() {
   if (!result.value) return
+  clearTimer()
   playing.value = true
   timer = setInterval(() => {
     if (currentStep.value < result.value.states.length - 1) {
@@ -40,10 +47,7 @@ function startPlay() {
 
 function stopPlay() {
   playing.value = false
-  if (timer) {
-    clearInterval(timer)
-    timer = null
-  }
+  clearTimer()
 }
 
 function stepForward() {
@@ -72,16 +76,25 @@ const stats = computed(() => {
   if (!result.value) return { totalProduced: 0, totalConsumed: 0 }
   return result.value.stats
 })
+
+watch(speed, () => {
+  if (playing.value) {
+    startPlay()
+  }
+})
+
+onBeforeUnmount(() => {
+  clearTimer()
+})
 </script>
 
 <template>
   <div class="page-container">
     <div class="page-header">
-      <router-link to="/" class="back-link">← 返回首页</router-link>
-      <h1>🔄 生产者-消费者同步模拟</h1>
+      <router-link to="/" class="back-link">返回首页</router-link>
+      <h1>生产者-消费者同步模拟</h1>
     </div>
 
-    <!-- 配置面板 -->
     <div class="control-panel">
       <div class="control-row">
         <span>缓冲区大小：</span>
@@ -100,7 +113,6 @@ const stats = computed(() => {
       </div>
     </div>
 
-    <!-- 播放控制 -->
     <div v-if="result" style="margin-bottom: 12px;">
       <PlaybackControl
         v-model="currentStep"
@@ -116,7 +128,6 @@ const stats = computed(() => {
       />
     </div>
 
-    <!-- 当前状态 -->
     <div v-if="currentState" class="control-panel">
       <div style="margin-bottom: 8px; display: flex; gap: 32px; font-size: 13px; color: #909399;">
         <span>步骤: {{ currentState.step }}</span>
@@ -135,7 +146,6 @@ const stats = computed(() => {
       />
     </div>
 
-    <!-- 统计 -->
     <div v-if="result" class="result-panel">
       <h3>模拟统计</h3>
       <div class="stats-row">
@@ -153,7 +163,6 @@ const stats = computed(() => {
         </div>
       </div>
 
-      <!-- 日志列表 -->
       <h3>执行日志</h3>
       <div class="log-list">
         <div
@@ -163,7 +172,7 @@ const stats = computed(() => {
         >
           {{ log }}
         </div>
-        <div v-if="!currentState?.log?.length" class="log-empty">—</div>
+        <div v-if="!currentState?.log?.length" class="log-empty">-</div>
       </div>
     </div>
   </div>

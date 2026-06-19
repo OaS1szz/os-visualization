@@ -1,23 +1,22 @@
 /**
- * 磁盘移臂调度算法
- * 每个函数返回 { order[], totalDistance, path[] }
- * order: 响应顺序
- * path: [{ step, pos, target? }] - 磁头移动路径
+ * 纾佺洏绉昏噦璋冨害绠楁硶
+ * 姣忎釜鍑芥暟杩斿洖 { order[], totalDistance, path[] }
+ * order: 鍝嶅簲椤哄簭
+ * path: [{ step, pos, target?, boundary? }] - 纾佸ご绉诲姩璺緞
  */
 
 /**
- * SSTF — 最短寻道时间优先
+ * SSTF 鈥?鏈€鐭閬撴椂闂翠紭鍏?
  */
 export function sstf(requests, startPos) {
   const remaining = [...requests]
   const order = []
-  const path = [{ step: 0, pos: startPos, target: null }]
+  const path = [{ step: 0, pos: startPos, target: null, boundary: false }]
   let currentPos = startPos
   let totalDistance = 0
   let stepCount = 0
 
   while (remaining.length > 0) {
-    // 找最近的请求
     let minDist = Infinity
     let minIndex = -1
 
@@ -30,14 +29,11 @@ export function sstf(requests, startPos) {
     }
 
     const target = remaining[minIndex]
-    const dist = Math.abs(target - currentPos)
-    totalDistance += dist
+    totalDistance += Math.abs(target - currentPos)
     currentPos = target
     order.push(target)
-
     stepCount++
-    path.push({ step: stepCount, pos: currentPos, target })
-
+    path.push({ step: stepCount, pos: currentPos, target, boundary: false })
     remaining.splice(minIndex, 1)
   }
 
@@ -45,44 +41,56 @@ export function sstf(requests, startPos) {
 }
 
 /**
- * SCAN — 电梯算法
- * @param {string} direction - 'up' (向外/增大) 或 'down' (向内/减小)
+ * SCAN 鐢垫绠楁硶
+ * @param {string} direction - 'up' 鎴? 'down'
+ * @param {number} maxTrack - 鏈€澶х閬撳彿
  */
-export function scan(requests, startPos, direction = 'up') {
+export function scan(requests, startPos, direction = 'up', maxTrack = 199) {
   const sorted = [...requests].sort((a, b) => a - b)
   const order = []
-  const path = [{ step: 0, pos: startPos, target: null }]
+  const path = [{ step: 0, pos: startPos, target: null, boundary: false }]
   let currentPos = startPos
   let totalDistance = 0
   let stepCount = 0
 
-  // 分离大于和小于当前磁道的请求
-  const greater = sorted.filter((t) => t >= currentPos)
-  const less = sorted.filter((t) => t < currentPos)
+  const greater = sorted.filter((track) => track >= currentPos)
+  const less = sorted.filter((track) => track < currentPos)
+  const route = []
 
-  let serveOrder
   if (direction === 'up') {
-    // 先向外（增大）服务，再折返服务内侧
-    serveOrder = [...greater, ...less.reverse()]
+    route.push(...greater.map((target) => ({ target, boundary: false })))
+    if (currentPos !== maxTrack && less.length > 0) {
+      route.push({ target: maxTrack, boundary: true })
+    }
+    route.push(...less.reverse().map((target) => ({ target, boundary: false })))
   } else {
-    // 先向内（减小）服务，再折返服务外侧
-    serveOrder = [...less.reverse(), ...greater]
+    route.push(...less.reverse().map((target) => ({ target, boundary: false })))
+    if (currentPos !== 0 && greater.length > 0) {
+      route.push({ target: 0, boundary: true })
+    }
+    route.push(...greater.map((target) => ({ target, boundary: false })))
   }
 
-  for (const target of serveOrder) {
-    const dist = Math.abs(target - currentPos)
-    totalDistance += dist
-    currentPos = target
-    order.push(target)
+  for (const point of route) {
+    totalDistance += Math.abs(point.target - currentPos)
+    currentPos = point.target
     stepCount++
-    path.push({ step: stepCount, pos: currentPos, target })
+    path.push({
+      step: stepCount,
+      pos: currentPos,
+      target: point.boundary ? null : point.target,
+      boundary: point.boundary,
+    })
+    if (!point.boundary) {
+      order.push(point.target)
+    }
   }
 
   return { order, totalDistance, path }
 }
 
 /**
- * 生成随机磁道请求序列
+ * 鐢熸垚闅忔満纾侀亾璇锋眰搴忓垪
  */
 export function generateRandomRequests(count = 8, maxTrack = 200) {
   const seq = []
@@ -93,7 +101,7 @@ export function generateRandomRequests(count = 8, maxTrack = 200) {
 }
 
 /**
- * 教材经典示例
+ * 鏁欐潗缁忓吀绀轰緥
  */
 export function getPresetRequests() {
   return [98, 183, 37, 122, 14, 124, 65, 67]

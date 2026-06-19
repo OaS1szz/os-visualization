@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   opt, lru, fifo, generateRandomSeq, getPresetSeq,
@@ -18,11 +18,18 @@ const speed = ref(1)
 
 let timer = null
 
+function clearTimer() {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+}
+
 function parseSeq() {
   return refSeqStr.value
-    .split(/[,，\s]+/)
-    .map((s) => parseInt(s.trim()))
-    .filter((n) => !isNaN(n))
+    .split(/[,\s]+/)
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => !Number.isNaN(n))
 }
 
 function run() {
@@ -32,19 +39,18 @@ function run() {
     return
   }
 
-  let res
   switch (algorithm.value) {
     case 'opt':
-      res = opt(seq, frameCount.value)
+      result.value = opt(seq, frameCount.value)
       break
     case 'lru':
-      res = lru(seq, frameCount.value)
+      result.value = lru(seq, frameCount.value)
       break
     case 'fifo':
-      res = fifo(seq, frameCount.value)
+      result.value = fifo(seq, frameCount.value)
       break
   }
-  result.value = res
+
   currentStep.value = 0
   stopPlay()
 }
@@ -60,13 +66,9 @@ function loadPreset() {
   run()
 }
 
-onMounted(() => {
-  run()
-})
-
-// 播放控制
 function startPlay() {
   if (!result.value) return
+  clearTimer()
   playing.value = true
   timer = setInterval(() => {
     if (currentStep.value < result.value.states.length - 1) {
@@ -79,10 +81,7 @@ function startPlay() {
 
 function stopPlay() {
   playing.value = false
-  if (timer) {
-    clearInterval(timer)
-    timer = null
-  }
+  clearTimer()
 }
 
 function stepForward() {
@@ -102,28 +101,39 @@ function reset() {
   stopPlay()
 }
 
-// 当前状态
 const currentState = computed(() => {
   if (!result.value) return null
   return result.value.states[currentStep.value]
 })
 
-// 用于显示全部状态的矩阵可视
 const displayStates = computed(() => {
   if (!result.value) return []
   if (playing.value) {
-    // 播放中显示到当前步
     return result.value.states.slice(0, currentStep.value + 1)
   }
   return result.value.states
+})
+
+watch(speed, () => {
+  if (playing.value) {
+    startPlay()
+  }
+})
+
+onMounted(() => {
+  run()
+})
+
+onBeforeUnmount(() => {
+  clearTimer()
 })
 </script>
 
 <template>
   <div class="page-container">
     <div class="page-header">
-      <router-link to="/" class="back-link">← 返回首页</router-link>
-      <h1>📄 页面置换算法模拟</h1>
+      <router-link to="/" class="back-link">返回首页</router-link>
+      <h1>页面置换算法模拟</h1>
     </div>
 
     <div class="control-panel">
@@ -140,7 +150,7 @@ const displayStates = computed(() => {
 
       <div class="control-row">
         <span>页面引用序列：</span>
-        <el-input v-model="refSeqStr" style="width: 500px;" placeholder="用逗号分隔，如：7,0,1,2,0,3,..." />
+        <el-input v-model="refSeqStr" style="width: 500px;" placeholder="用逗号分隔，如 7,0,1,2,0,3" />
       </div>
 
       <div class="control-row">
@@ -150,7 +160,6 @@ const displayStates = computed(() => {
       </div>
     </div>
 
-    <!-- 播放控制 -->
     <div v-if="result" style="margin-bottom: 12px;">
       <PlaybackControl
         v-model="currentStep"
@@ -166,7 +175,6 @@ const displayStates = computed(() => {
       />
     </div>
 
-    <!-- 当前步骤状态 -->
     <div v-if="currentState && result" class="control-panel">
       <div style="display: flex; gap: 32px; align-items: center;">
         <div>
@@ -194,7 +202,6 @@ const displayStates = computed(() => {
       </div>
     </div>
 
-    <!-- 结果 -->
     <div v-if="result" class="result-panel">
       <h3>内存状态变化矩阵</h3>
       <MemoryGrid
