@@ -101,6 +101,10 @@ function reset() {
   stopPlay()
 }
 
+function handleSpeedUpdate(v) {
+  speed.value = v
+}
+
 const currentState = computed(() => {
   if (!result.value) return null
   return result.value.states[currentStep.value]
@@ -171,7 +175,7 @@ onBeforeUnmount(() => {
         @step-forward="stepForward"
         @step-back="stepBack"
         @reset="reset"
-        @update:speed="(v) => speed = v"
+        @update:speed="handleSpeedUpdate"
       />
     </div>
 

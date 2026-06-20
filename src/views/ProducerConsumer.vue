@@ -50,6 +50,10 @@ function stopPlay() {
   clearTimer()
 }
 
+function handleSpeedUpdate(v) {
+  speed.value = v
+}
+
 function stepForward() {
   if (result.value && currentStep.value < result.value.states.length - 1) {
     currentStep.value++
@@ -124,7 +128,7 @@ onBeforeUnmount(() => {
         @step-forward="stepForward"
         @step-back="stepBack"
         @reset="reset"
-        @update:speed="(v) => speed = v"
+        @update:speed="handleSpeedUpdate"
       />
     </div>
 

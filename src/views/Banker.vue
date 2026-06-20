@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getPresetData, checkSafety, requestResources } from '../algorithms/banker.js'
 
@@ -18,6 +18,13 @@ const safeResult = ref(null)
 const requestResult = ref(null)
 const requestPid = ref(0)
 const requestRes = reactive([0, 0, 0])
+
+const processRows = computed(() => processes.map((p) => ({
+  id: p.id,
+  max: [...p.max],
+  allocation: [...p.allocation],
+  need: calcNeed(p),
+})))
 
 function calcNeed(p) {
   return p.max.map((v, j) => v - p.allocation[j])
@@ -134,6 +141,17 @@ function loadPreset() {
 function reset() {
   loadPreset()
 }
+
+function safeStepRows() {
+  if (!safeResult.value?.steps) return []
+  return safeResult.value.steps.map((step, index) => ({
+    step: index + 1,
+    process: `P${step.process}`,
+    workBefore: step.workBefore.join(', '),
+    workAfter: step.workAfter.join(', '),
+    finished: step.finished.map((v) => (v ? '1' : '0')).join(' '),
+  }))
+}
 </script>
 
 <template>
@@ -166,7 +184,7 @@ function reset() {
 
     <div class="control-panel">
       <h3>进程资源状态</h3>
-      <el-table :data="processes" border stripe style="width: 100%">
+      <el-table :data="processRows" border stripe style="width: 100%">
         <el-table-column prop="id" label="PID" width="60" />
         <el-table-column label="Max (A, B, C)">
           <template #default="{ row }">
@@ -174,7 +192,7 @@ function reset() {
               <el-input-number
                 v-for="j in 3"
                 :key="'max' + j"
-                v-model="row.max[j - 1]"
+                v-model="processes[row.id].max[j - 1]"
                 :min="0"
                 :max="99"
                 size="small"
@@ -189,7 +207,7 @@ function reset() {
               <el-input-number
                 v-for="j in 3"
                 :key="'alloc' + j"
-                v-model="row.allocation[j - 1]"
+                v-model="processes[row.id].allocation[j - 1]"
                 :min="0"
                 :max="99"
                 size="small"
@@ -200,7 +218,7 @@ function reset() {
         </el-table-column>
         <el-table-column label="Need (A, B, C)">
           <template #default="{ row }">
-            <span class="need-display">{{ calcNeed(row).join(', ') }}</span>
+            <span class="need-display">{{ row.need.join(', ') }}</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="100">
@@ -231,6 +249,20 @@ function reset() {
           />
         </el-steps>
       </div>
+      <el-table
+        v-if="safeStepRows().length"
+        :data="safeStepRows()"
+        border
+        stripe
+        size="small"
+        style="margin-top: 16px;"
+      >
+        <el-table-column prop="step" label="步骤" width="70" />
+        <el-table-column prop="process" label="完成进程" width="100" />
+        <el-table-column prop="workBefore" label="Work Before" />
+        <el-table-column prop="workAfter" label="Work After" />
+        <el-table-column prop="finished" label="Finish" />
+      </el-table>
     </div>
 
     <div class="control-panel" style="margin-top: 20px;">
